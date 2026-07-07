@@ -5,10 +5,10 @@ spike for the parallel-first rewrite. lives outside src/simulation on purpose,
 not touching real Simulation.cpp/Particle.h yet. once the double buffer +
 command queue + chunking pattern actually proves out on this toy grid ill
 look at porting the pattern into the real Parts/pmap stuff. that repo is
-genuinely massive (109kb Simulation.cpp lol) so no way am i rewriting that
-before knowing this approach even works.
+genuinely massive (109kb Simulation.cpp lol) so no way am i rewriting... that... 
+before knowing what approach even works.
 
-only 4 elements: sand, water, steam, fire. matches what was asked, keeps
+only 4 elements: sand, water, steam, fire. keeps
 the decide logic small enough to reason about while the plumbing is still
 changing every day.
 
