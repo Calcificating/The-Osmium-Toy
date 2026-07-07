@@ -37,17 +37,6 @@ void resolveCommands(World& w, std::vector<Cmd>& cmds) {
                 w.atNext(c.tx, c.ty) = np;
                 break;
             }
-            case CMD_HEAT: {
-                Particle& target = w.atNext(c.tx, c.ty);
-                if (c.amt < 0) {
-                    // hack: negative amt means its actually a life decrement,
-                    // reusing HEAT for this so i didnt have to add another cmd type
-                    target.life += (int)c.amt;
-                } else {
-                    target.temp += c.amt;
-                }
-                break;
-            } // 1 bracket
-        } // 2 bracket
-    } // 3 bracket
-} // 4 bracket... escalator?
+        } 
+    } 
+} 
