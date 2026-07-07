@@ -8,10 +8,10 @@ void resolveCommands(World& w, std::vector<Cmd>& cmds) {
         switch (c.type) {
             case CMD_MOVE: {
                 // check the dest is still free before stomping it.
-                // NOTEE: checking w.at() (cur) here, not atNext(). that means
+                // NOTEE: checking w.at() (cur) here, not atNext(). means
                 // if an earlier command in this SAME tick already moved
                 // something into (tx,ty), this check wont see it and we
-                // overwrite it anyway. probably why sand piles look weird sometimes
+                // overwrite it anyway. probabably why sand piles look weird sometimes
                 if (w.at(c.tx, c.ty).type == TYPE_EMPTY) {
                     w.atNext(c.tx, c.ty) = w.at(c.fx, c.fy);
                     w.atNext(c.fx, c.fy) = Particle{};
@@ -37,6 +37,17 @@ void resolveCommands(World& w, std::vector<Cmd>& cmds) {
                 w.atNext(c.tx, c.ty) = np;
                 break;
             }
-        } 
-    } 
-} 
+            case CMD_HEAT: {
+                Particle& target = w.atNext(c.tx, c.ty);
+                if (c.amt < 0) {
+                    // negative amt means its actually a life decrement,
+                    // reusing HEAT for this so i didnt have to add another cmd type, will do
+                    target.life += (int)c.amt;
+                } else {
+                    target.temp += c.amt;
+                }
+                break;
+            }
+        }
+    }
+}
