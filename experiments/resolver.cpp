@@ -47,7 +47,7 @@ void resolveCommands(World& w, std::vector<Cmd>& cmds) {
                     target.temp += c.amt;
                 }
                 break;
-            }
-        }
-    }
-}
+            } // 1 bracket
+        } // 2 bracket
+    } // 3 bracket
+} // 4 bracket... escalator?
