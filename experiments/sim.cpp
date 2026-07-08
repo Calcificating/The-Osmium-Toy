@@ -5,16 +5,11 @@
 #include "rng.h"
 #include <thread>
 #include <vector>
-
-const int NUM_CHUNKS = 4; // still hardcoded, see notes.md, not fixing this one yet
+#include <algorithm>
 
 static void decideChunk(const World& w, int startY, int endY, CmdQueue& outQ,
                          uint32_t seed, int chunkIdx, int tick) {
     Rng rng = makeChunkRng(seed, chunkIdx, tick);
-    // fixed: was "y <= endY" before, which meant the row at endY got
-    // processed twice, once by this chunk and once by the next chunk
-    // starting there too. now endY is a proper exclusive bound and the
-    // last chunk soaks up whatever remainder rows dont divide evenly
     for (int y = startY; y < endY; y++) {
         for (int x = 0; x < WIDTH; x++) {
             CmdQueue single;
@@ -24,17 +19,19 @@ static void decideChunk(const World& w, int startY, int endY, CmdQueue& outQ,
     }
 }
 
-void simTick(World& w, uint32_t seed, int tick) {
-    int chunkSize = HEIGHT / NUM_CHUNKS;
+void simTick(World& w, uint32_t seed, int tick, int numChunks) {
+    // dont let someone pass 0 or something dumb and hang the sim
+    numChunks = std::max(1, std::min(numChunks, HEIGHT));
 
-    std::vector<CmdQueue> localQueues(NUM_CHUNKS);
+    int chunkSize = HEIGHT / numChunks;
+
+    std::vector<CmdQueue> localQueues(numChunks);
     std::vector<std::thread> workers;
+    workers.reserve(numChunks);
 
-    for (int c = 0; c < NUM_CHUNKS; c++) {
+    for (int c = 0; c < numChunks; c++) {
         int startY = c * chunkSize;
-        int endY = (c == NUM_CHUNKS - 1) ? HEIGHT : startY + chunkSize;
-        // world passed by const ref now, compute side literally cannot
-        // write into it even if it wanted to
+        int endY = (c == numChunks - 1) ? HEIGHT : startY + chunkSize;
         workers.emplace_back(decideChunk, std::cref(w), startY, endY,
                               std::ref(localQueues[c]), seed, c, tick);
     }
