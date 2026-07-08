@@ -2,26 +2,29 @@
 #include "elements.h"
 #include "resolver.h"
 #include "command.h"
+#include "rng.h"
 #include <thread>
 #include <vector>
 
-// just hardcoding 4 chunks for now instead of hardware_concurrency(),
-// want a fixed number while im debugging so results are at least
-// consistent between runs on my machine
-const int NUM_CHUNKS = 4;
+const int NUM_CHUNKS = 4; // still hardcoded, see notes.md, not fixing this one yet
 
-static void decideChunk(World& w, int startY, int endY, CmdQueue& outQ) {
-    // endY is meant to be exclusive but see the caller, pretty sure
-    // theres an off by one somewhere around the chunk boundaries
-    for (int y = startY; y <= endY; y++) {
-        if (y >= HEIGHT) continue;
+static void decideChunk(const World& w, int startY, int endY, CmdQueue& outQ,
+                         uint32_t seed, int chunkIdx, int tick) {
+    Rng rng = makeChunkRng(seed, chunkIdx, tick);
+    // fixed: was "y <= endY" before, which meant the row at endY got
+    // processed twice, once by this chunk and once by the next chunk
+    // starting there too. now endY is a proper exclusive bound and the
+    // last chunk soaks up whatever remainder rows dont divide evenly
+    for (int y = startY; y < endY; y++) {
         for (int x = 0; x < WIDTH; x++) {
-            decideCell(w, x, y, outQ);
+            CmdQueue single;
+            single.append(ComputeIntentForCell(w, x, y, rng));
+            outQ.append(single.cmds);
         }
     }
 }
 
-void simTick(World& w) {
+void simTick(World& w, uint32_t seed, int tick) {
     int chunkSize = HEIGHT / NUM_CHUNKS;
 
     std::vector<CmdQueue> localQueues(NUM_CHUNKS);
@@ -29,19 +32,20 @@ void simTick(World& w) {
 
     for (int c = 0; c < NUM_CHUNKS; c++) {
         int startY = c * chunkSize;
-        int endY = startY + chunkSize; // should be exclusive top, but decideChunk uses <=
-        workers.emplace_back(decideChunk, std::ref(w), startY, endY, std::ref(localQueues[c]));
+        int endY = (c == NUM_CHUNKS - 1) ? HEIGHT : startY + chunkSize;
+        // world passed by const ref now, compute side literally cannot
+        // write into it even if it wanted to
+        workers.emplace_back(decideChunk, std::cref(w), startY, endY,
+                              std::ref(localQueues[c]), seed, c, tick);
     }
     for (auto& t : workers) t.join();
 
-    // merge everything into one big list, not bothering with anything
-    // smarter than just concatenating for now
     std::vector<Cmd> merged;
     for (auto& q : localQueues) {
-        for (auto& c : q.cmds) merged.push_back(c);
+        merged.insert(merged.end(), q.cmds.begin(), q.cmds.end());
     }
 
     w.clearNext();
-    resolveCommands(w, merged); // still single threaded, one thing at a time
+    resolveCommands(w, merged);
     w.swapBuffers();
 }
