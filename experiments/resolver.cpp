@@ -5,59 +5,84 @@ static inline int64_t cellKey(int x, int y) {
     return (int64_t)y * WIDTH + x;
 }
 
-void resolveCommands(World& w, std::vector<Cmd>& cmds) {
-    // pass 1: who wants to claim which destination cell. only MOVE and
-    // CREATE actually claim a slot, so those are the only ones that can
-    // conflict with each other. this map has zero idea what a Cmd's newType
-    // even means, it just groups by target coord
-    std::unordered_map<int64_t, std::vector<int>> claims;
-    for (size_t i = 0; i < cmds.size(); i++) {
-        const Cmd& c = cmds[i];
-        if (c.type == CMD_MOVE || c.type == CMD_CREATE) {
-            claims[cellKey(c.tx, c.ty)].push_back((int)i);
-        }
+// which cells does this command actually write into in nxt. HEAT/AGE dont
+// count, they modify a field on whatever already ended up in that cell,
+// they dont change WHO occupies it, so they arent part of the occupancy
+// fight. everything else (move, swap, delete, create) changes what particle
+// lives in a cell so all of those need to go through arbitration
+static void touchedCells(const Cmd& c, int64_t out[2], int& count) {
+    count = 0;
+    switch (c.type) {
+        case CMD_MOVE:
+        case CMD_CREATE:
+            out[count++] = cellKey(c.tx, c.ty);
+            break;
+        case CMD_SWAP:
+            out[count++] = cellKey(c.fx, c.fy);
+            out[count++] = cellKey(c.tx, c.ty);
+            break;
+        case CMD_DELETE:
+            out[count++] = cellKey(c.fx, c.fy);
+            break;
+        default:
+            break; // HEAT, AGE
     }
+}
 
-    std::vector<char> dropped(cmds.size(), 0);
-    for (auto& kv : claims) {
-        auto& idxs = kv.second;
-        if (idxs.size() <= 1) continue;
+// true if a is a "better" claim than b. priority first, then lower source
+// coord wins. this is the ENTIRE opinion the resolver has about who should
+// win a conflict, it doesnt know anything about what a or b actually do
+static bool beats(const Cmd& a, const Cmd& b) {
+    if (a.priority != b.priority) return a.priority > b.priority;
+    return cellKey(a.fx, a.fy) < cellKey(b.fx, b.fy);
+}
 
-        // more than one command wants the same cell this tick. pick a
-        // winner using the source cell as a deterministic tiebreak (lowest
-        // key wins) instead of "whoever got merged into the list first",
-        // which used to depend on chunk order and wasnt really a decision,
-        // just an accident of how the queues got concatenated
-        int winner = idxs[0];
-        for (int idx : idxs) {
-            if (cellKey(cmds[idx].fx, cmds[idx].fy) < cellKey(cmds[winner].fx, cmds[winner].fy)) {
-                winner = idx;
+void resolveCommands(World& w, std::vector<Cmd>& cmds) {
+    // pass 1: for every cell, figure out which single command "owns" it
+    // this tick. a command has to win at EVERY cell it touches to survive
+    // (matters for swap, which touches two cells at once - if it only wins
+    // one of them we cant do half a swap, so the whole thing gets dropped)
+    std::unordered_map<int64_t, int> cellOwner; // cell -> winning cmd index
+
+    for (size_t i = 0; i < cmds.size(); i++) {
+        int64_t touched[2];
+        int n = 0;
+        touchedCells(cmds[i], touched, n);
+        for (int k = 0; k < n; k++) {
+            int64_t cell = touched[k];
+            auto it = cellOwner.find(cell);
+            if (it == cellOwner.end()) {
+                cellOwner[cell] = (int)i;
+            } else if (beats(cmds[i], cmds[it->second])) {
+                it->second = (int)i;
             }
         }
-        for (int idx : idxs) {
-            if (idx != winner) dropped[idx] = 1;
+    }
+
+    std::vector<char> survives(cmds.size(), 1);
+    for (size_t i = 0; i < cmds.size(); i++) {
+        int64_t touched[2];
+        int n = 0;
+        touchedCells(cmds[i], touched, n);
+        for (int k = 0; k < n; k++) {
+            if (cellOwner[touched[k]] != (int)i) {
+                survives[i] = 0;
+                break;
+            }
         }
     }
 
-    // known gap: SWAP isnt going through the claims map at all right now,
-    // so two things swapping with overlapping cells in the same tick isnt
-    // handled. havent hit it in practice with just sand/water but its not
-    // actually safe. see notes.md
-
-    // pass 2: apply whatever survived. this part does still switch on
-    // Cmd.type, but only to know "a move copies fields A/B/C", not
-    // "sand does X". CREATE pulls its starting values straight off the cmd
-    // instead of the old hardcoded if(newType==TYPE_FIRE) branch
+    // pass 2: apply whatever survived. still switches on Cmd.type here but
+    // only to know the SHAPE of the command (move copies fields, heat adds
+    // a float), not what element emitted it
     for (size_t i = 0; i < cmds.size(); i++) {
-        if (dropped[i]) continue;
+        if (!survives[i]) continue;
         const Cmd& c = cmds[i];
 
         switch (c.type) {
             case CMD_MOVE: {
-                if (w.atNext(c.tx, c.ty).type == TYPE_EMPTY) {
-                    w.atNext(c.tx, c.ty) = w.at(c.fx, c.fy);
-                    w.atNext(c.fx, c.fy) = Particle{};
-                }
+                w.atNext(c.tx, c.ty) = w.at(c.fx, c.fy);
+                w.atNext(c.fx, c.fy) = Particle{};
                 break;
             }
             case CMD_SWAP: {
@@ -72,22 +97,11 @@ void resolveCommands(World& w, std::vector<Cmd>& cmds) {
                 break;
             }
             case CMD_CREATE: {
-                // most CREATEs from our elements are actually self-transforms
-                // (water -> steam happens at the same cell it started in).
-                // clearNext() already copied the OLD particle into nxt at
-                // that cell, so a plain "is nxt empty" check fails every
-                // single time for these and the transform silently never
-                // applies. caught this by actually watching steam count in
-                // a test run instead of just eyeballing the ascii art.
-                // same buffer-mixup shape as the move bug, annoyingly
-                bool selfSlot = (c.fx == c.tx && c.fy == c.ty);
-                if (selfSlot || w.atNext(c.tx, c.ty).type == TYPE_EMPTY) {
-                    Particle np;
-                    np.type = c.newType;
-                    np.temp = c.newTemp;
-                    np.life = c.newLife;
-                    w.atNext(c.tx, c.ty) = np;
-                }
+                Particle np;
+                np.type = c.newType;
+                np.temp = c.newTemp;
+                np.life = c.newLife;
+                w.atNext(c.tx, c.ty) = np;
                 break;
             }
             case CMD_HEAT: {
