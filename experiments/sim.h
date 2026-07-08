@@ -2,5 +2,7 @@
 #include "world.h"
 
 // seed and tick get threaded through so the per-chunk rng is fully
-// deterministic and reproducible, not tied to wall clock or thread order
-void simTick(World& w, uint32_t seed, int tick);
+// deterministic and reproducible, not tied to wall clock or thread order.
+// numChunks used to be a hardcoded const in here, pulled it out to a param
+// so bench.cpp can sweep over it without recompiling
+void simTick(World& w, uint32_t seed, int tick, int numChunks = 4);
