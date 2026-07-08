@@ -26,6 +26,13 @@ struct Cmd {
     float newTemp = 22.0f;
 
     float amt = 0.0f;         // used by HEAT (temp delta) and AGE (life delta)
+
+    // higher priority wins a cell conflict before falling back to the
+    // coordinate tiebreak. nothing sets this to anything but 0 yet, added
+    // it because "which command SHOULD win" turned out to be a real
+    // question (see notes.md, simultaneous create/delete/move test) and
+    // didnt want to hardcode an opinion about it into the resolver itself
+    int priority = 0;
 };
 
 struct CmdQueue {
