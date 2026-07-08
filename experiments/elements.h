@@ -1,12 +1,17 @@
 #pragma once
 #include "world.h"
 #include "command.h"
+#include "rng.h"
+#include <vector>
 
-// phase 1 stuff - particle looks at cur (read only) and pushes commands
-// it does NOT touch the world directly, thats the whole point of this experiment
-void decideSand(World& w, int x, int y, CmdQueue& q);
-void decideWater(World& w, int x, int y, CmdQueue& q);
-void decideSteam(World& w, int x, int y, CmdQueue& q);
-void decideFire(World& w, int x, int y, CmdQueue& q);
+// stateless on purpose. each of these takes a READ ONLY world (compiler
+// enforced, see world.h), the cell its looking at, and an rng it does not
+// own. returns whatever it wants to happen, doesnt touch anything itself.
+// no element here knows threads or chunks exist
 
-void decideCell(World& w, int x, int y, CmdQueue& q);
+namespace Sand  { std::vector<Cmd> ComputeIntent(const World& w, int x, int y, Rng& rng); }
+namespace Water { std::vector<Cmd> ComputeIntent(const World& w, int x, int y, Rng& rng); }
+namespace Steam { std::vector<Cmd> ComputeIntent(const World& w, int x, int y, Rng& rng); }
+namespace Fire  { std::vector<Cmd> ComputeIntent(const World& w, int x, int y, Rng& rng); }
+
+std::vector<Cmd> ComputeIntentForCell(const World& w, int x, int y, Rng& rng);
