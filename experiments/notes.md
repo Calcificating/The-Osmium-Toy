@@ -1,86 +1,156 @@
-quick notes, not a design doc, just so i dont forget what state this is in
+## bugs from last time, fixed
 
-## what this is
-spike for the parallel-first rewrite. lives outside src/simulation on purpose,
-not touching real Simulation.cpp/Particle.h yet. once the double buffer +
-command queue + chunking pattern actually proves out on this toy grid ill
-look at porting the pattern into the real Parts/pmap stuff. that repo is
-genuinely massive (109kb Simulation.cpp lol) so no way am i rewriting... that... 
-before knowing what approach even works.
+1. resolver was checking w.at() (cur) to see if a MOVE dest was free, should
+   have been checking w.atNext(). fixed, now checks atNext so it actually
+   sees claims made earlier in the same tick.
+2. sand boundary was "y + 1 <= HEIGHT" (should be <). fixed. verified by
+   just reading the diff, didnt bother writing a specific repro for this
+   one, its pretty obviously right now.
+3. chunk boundary was "y <= endY" with endY = startY + chunkSize, so
+   boundary rows got processed by two threads. fixed to proper exclusive
+   range, last chunk absorbs the remainder if HEIGHT doesnt divide evenly
+   by NUM_CHUNKS.
+4. rand() called from multiple threads with no synchronization. fixed by
+   giving each chunk its own seeded Rng built fresh every tick from
+   (seed, chunkIdx, tick). this one mattered more than i expected, see
+   determinism section below.
+5. bonus bug i introduced AND caught this round: when i moved CREATE to be
+   fully data driven, i forgot that self-transform creates (water->steam
+   happens at the same cell, not a different one) were getting blocked by
+   the same "is nxt empty" check as cross-cell creates. clearNext() already
+   put the OLD particle in nxt at that cell so it never looked empty. fixed
+   by special-casing fx==tx && fy==ty as always allowed. found this by
+   writing a tiny isolated repro (pinned water next to fire with walls so
+   it couldnt just fall away) instead of trusting the big demo scene, which
+   never got fire close enough to water to even trigger the transform.
+   lesson: the demo scene is not a test, need actual small repros for this
+   stuff going forward.
 
-only 4 elements: sand, water, steam, fire. keeps
-the decide logic small enough to reason about while the plumbing is still
-changing every day.
+## question 1: can elements be stateless?
 
-## architecture as of now
-- World has cur/nxt buffers (world.h/cpp)
-- decide phase reads cur only, never writes to it, pushes Cmd's to a
-  per-thread queue (elements.cpp)
-- world split into 4 horizontal chunks, one thread per chunk does the
-  decide phase (sim.cpp)
-- after threads join, queues get concat'd into one vector
-- resolver runs SINGLE THREADED over the merged list and writes into nxt
-  (resolver.cpp)
-- swap buffers, repeat
+yeah, basically already were in spirit last round, made it literal this
+time. Sand/Water/Steam/Fire are namespaces now, ComputeIntent(world, x, y,
+rng) -> vector<Cmd>, no shared state between calls, no member variables,
+nothing. same inputs always produce the same list of commands (rng aside,
+and even that is deterministic given the same Rng state going in).
 
-resolver being single threaded is deliberate for now, not a limitation im
-worried about yet. wanted to get the read/write separation correct before
-even thinking about making resolve parallel too.
+one thing i noticed doing this: Steam::ComputeIntent used to do
+"p.life++" directly on the particle since it had a mutable ref. cant do
+that anymore obviously, so aging becomes a CMD_AGE command like everything
+else. felt a little silly writing a whole command just to increment a
+counter but it means literally 100% of world mutation goes through the
+same pipe now, no exceptions, which is the point.
 
-## known issues / stuff to fix
-- resolver checks w.at() (cur) to see if a MOVE destination is free, but it
-  should check w.atNext() since an earlier cmd in the same merged list may
-  have already claimed that cell this tick. means two particles can stomp
-  each other in the same tick sometimes. havent seen it visually break yet
-  but its definitely there, its just the demo scene doesnt cause it much
-- decideSand has "if (y + 1 <= HEIGHT)" which should be "< HEIGHT". when
-  sand is on the actual last row this reads/writes w.at(x, HEIGHT) which is
-  one row past the buffer. didnt crash in the 200 tick demo since the sand
-  never made it all the way to row 89, but its a landmine, dont trust this
-  near the bottom edge yet
-- decideChunk loop is "for (y = startY; y <= endY; y++)" and endY is
-  startY + chunkSize, so the row at each chunk boundary probably gets
-  processed twice (once as the last row of chunk N, once as first row of
-  chunk N+1's range since off by one). doesnt crash, just means boundary
-  rows get double the update chance, probably visible as slightly faster
-  sand at the seams if you stare at it long enough. havent verified this
-  one closely, just noticed the math looks wrong when writing it
-- using rand() inside decideSand/Water/Steam, called from multiple threads
-  at once (each chunk thread calls into these). rand() isnt actually
-  documented as thread safe, it "works" here but should be a thread_local
-  rng per chunk instead. exactly the kind of thing this whole project is
-  supposed to catch before it becomes a habit lol
-- CMD_CREATE doesnt copy temp/life from the source particle, e.g. water
-  turning to steam always resets to room temp. fine for now since we dont
-  visually check temp, will matter once fire heating actually matters
-- NUM_CHUNKS is hardcoded to 4, not hardware_concurrency(). doing this on
-  purpose while debugging so chunk boundaries are consistent between runs,
-  but need to make it a config/cli arg before this goes anywhere
+## question 2: is World read-only during compute?
 
-## stuff that seems to actually work
-- double buffer separation feels right, decide phase never mutates cur,
-  pretty easy to reason about
-- command queue pattern is nice, elements dont know anything about threads
-  or chunks, they just emit intents
-- chunking + std::thread for phase 1 was way less painful than expected,
-  the actual footgun is all in phase 2 (resolver) which is still serial
-  anyway so no data races there currently, just the logic bug above
+yes now, compiler enforced not just convention. World::atNext has no const
+overload at all, so if you hold a const World& (which is what
+ComputeIntent takes), the write side of the buffer just isnt reachable,
+wont compile. tried it on purpose (see draft 1 above), confirmed it breaks
+loudly instead of silently doing the wrong thing.
 
-## next steps (unordered)
-- fix the resolver dest check (nxt not cur)
-- fix sand boundary off by one
-- fix chunk range off by one
-- try making resolveCommands itself chunk-local + parallel, only fall back
-  to a serial pass for conflicts that cross chunk boundaries. this is
-  probably the actual interesting part of the whole project
-- pull NUM_CHUNKS from hardware_concurrency with a manual override flag
-- once resolver's parallel-safe, look at what porting this into the real
-  Parts array / pmap in src/simulation would look like. Particle.h already
-  has temp/life/tmp fields so the mapping isnt crazy, x/y being floats
-  there instead of grid ints is the main thing that'll need thought
+only place still holding a non-const World& is resolver.cpp and
+sim.cpp's outer simTick (which needs it for clearNext/swapBuffers). decide
+side is fully locked out.
 
-## how to run it
-g++ -std=c++17 -O1 -pthread -Wall -Wextra world.cpp elements.cpp resolver.cpp sim.cpp main.cpp -o spike
-./spike
-prints an ascii downsampled grid every 20 ticks, 200 ticks total. not
-pretty but enough to eyeball whether sand/water/fire are behaving sanely.
+## question 3: can the resolver stay dumb?
+
+closer than before. it now does a real two pass thing:
+
+pass 1 groups commands by target cell and only cares "how many things want
+this cell" - doesnt look at newType, doesnt know sand exists, just sees
+coordinates and a cmd index. ties get broken by comparing source cell
+coordinates, not by whichever chunk happened to get merged first.
+
+pass 2 still switches on Cmd.type to know the SHAPE of each command (a
+move copies a particle, a heat adds to temp) but that's structural
+knowledge about the command system itself, not about elements. CREATE
+pulls newType/newLife/newTemp straight off the cmd now instead of the old
+"if (newType == TYPE_FIRE) life = 50" hardcode from last round, so thats
+one less place the resolver was secretly element-aware.
+
+still not 100% dumb: SWAP doesnt go through the claims map at all right
+now, so it's not part of conflict resolution, it just always happens. fine
+while only sand/water swap and nothing else contests those cells, but its
+a real gap, not something i fixed, just flagging it.
+
+## question 4: determinism
+
+built detcheck.cpp for this. same seed, run 100 ticks, hash the world
+(fnv-ish over type/life/temp per particle), do that 7 times total (2 in
+one process + 5 more), compare hashes.
+
+ran it for real, pasting actual output, not making this up:
+
+    run1 hash: 3889698476444987310
+    run2 hash: 3889698476444987310
+    DETERMINISTIC (matched)
+    extra run 0 hash: 3889698476444987310 ok
+    extra run 1 hash: 3889698476444987310 ok
+    extra run 2 hash: 3889698476444987310 ok
+    extra run 3 hash: 3889698476444987310 ok
+    extra run 4 hash: 3889698476444987310 ok
+    all runs matched
+
+also ran the whole binary 3 separate times as different processes (not
+just within one run), same hash every time. the fix that actually mattered
+here was the per-chunk seeded rng - before that, rand() being called from
+multiple threads concurrently meant which thread got which random number
+depended on scheduling, so two runs could easily diverge. worth noting
+this WOULD have been silently nondeterministic before and i wouldnt have
+known just from looking at it, the hash check is what would've caught it.
+
+things that could still break determinism later and arent tested yet:
+floats generally (temp accumulation order matters if we ever sum multiple
+HEAT commands targeting the same cell instead of applying them in a fixed
+order - right now they apply in cmds vector order which IS fixed given
+fixed chunk merge order, but if resolver ever gets parallelized this needs
+another look), and the SWAP gap mentioned above if two elements ever both
+try to swap into the same pair of cells.
+
+## question 5: command ownership, improvising here
+
+didnt build much code for this, mostly just thinking through it:
+
+right now a "command" doesnt have any real identity beyond fx/fy as its
+source, and fx/fy also happens to be how we identify a particle (grid
+position = identity, no persistent particle ids). that works fine as long
+as a particle only ever emits commands about its own current cell, which
+is true today, ComputeIntentForCell always calls the element fn with the
+particle's own x,y.
+
+the thing i'd actually want before this goes further: an explicit
+ownerId on Cmd, separate from fx/fy, tied to a stable particle id instead
+of a grid coordinate. reason being, position-as-identity breaks the moment
+you want to track "this specific sand grain" across a move for anything
+more than the immediate resolve (debugging, damage over time, whatever).
+also matters for catching a bad element implementation: if ownership is
+just "whatever fx/fy says", theres nothing stopping a buggy compute fn
+from emitting a command with someone elses fx/fy in it and thered be no
+way to tell. an ownerId the resolver could sanity check against "did this
+chunk actually own this particle this tick" would catch that class of bug
+for free.
+
+not adding it yet since it means giving every particle a real id (a slot
+index + generation counter probably, to handle reuse safely), which is a
+bigger change than todays session. flagging it as the next real
+architecture piece though, feels more important than making NUM_CHUNKS
+configurable at this point.
+
+## still on the todo pile, not touched this round
+
+- SWAP not going through conflict resolution
+- NUM_CHUNKS hardcoded to 4
+- resolver still fully single threaded (pass 1 could probably parallelize
+  per-chunk with a final merge, pass 2 harder since it writes shared state)
+- no real particle id / ownership system yet, see question 5
+- havent ported any of this into the real Simulation.cpp/Particle.h yet,
+  still just the standalone spike
+
+## how to build/run
+
+    g++ -std=c++17 -O1 -pthread -Wall -Wextra world.cpp elements.cpp resolver.cpp sim.cpp scene.cpp main.cpp -o demo
+    ./demo
+
+    g++ -std=c++17 -O1 -pthread -Wall -Wextra world.cpp elements.cpp resolver.cpp sim.cpp scene.cpp detcheck.cpp -o detcheck
+    ./detcheck
