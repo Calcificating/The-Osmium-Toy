@@ -1,21 +1,21 @@
-The Powder Toy - June 2026
+The Osmium Toy - July 2026
 ==========================
 
-Get the latest version [from the Powder Toy website](https://powdertoy.co.uk/Download.html). We're also on [Steam](https://store.steampowered.com/app/1148350/The_Powder_Toy/).
+_**The Osmium Toy's**_ [research branch](https://github.com/Calcificating/The-Osmium-Toy/tree/research) purpose is for *testing and prototyping*, *answering questions and considerations* and applying it to the Official TPT Codebase.
+Check the [master](https://github.com/Calcificating/The-Osmium-Toy/tree/master) for successfully implemented ideas.
 
-To use online features such as saving, you need to [register an account](https://powdertoy.co.uk/Register.html).
-You can also visit [the official TPT forum](https://powdertoy.co.uk/Discussions/Categories/Index.html).
+
+[Download The Powder Toy](https://powdertoy.co.uk/Download.html)
+[TPT on Steam](https://store.steampowered.com/app/1148350/The_Powder_Toy/).
+[Register an Account on the Official website](https://powdertoy.co.uk/Register.html).
+[The Official TPT forum](https://powdertoy.co.uk/Discussions/Categories/Index.html).
+[The Official TPT Wiki](https://powdertoy.co.uk/Wiki/W/Main_Page.html).
 
 Have you ever wanted to blow something up? Or maybe you always dreamt of operating an atomic power plant? Do you have a will to develop your own CPU? The Powder Toy lets you to do all of these, and even more!
 
 The Powder Toy is a free physics sandbox game, which simulates air pressure and velocity, heat, gravity and a countless number of interactions between different substances! The game provides you with various building materials, liquids, gases and electronic components which can be used to construct complex machines, guns, bombs, realistic terrains and almost anything else. You can then mine them and watch cool explosions, add intricate wirings, play with little stickmen or operate your machine. You can browse and play thousands of different saves made by the community or upload your own – we welcome your creations!
 
 There is a Lua API – you can automate your work or even make plugins for the game. The Powder Toy is free and the source code is distributed under the GNU General Public License, so you can modify the game yourself or help with development.
-
-Build instructions
-===========================================================================
-
-See the _Powder Toy Development Help_ section [on the main page of the wiki](https://powdertoy.co.uk/Wiki/W/Main_Page.html).
 
 Special Thanks
 ===========================================================================
@@ -37,7 +37,7 @@ Special Thanks
 * mniip
 * LBPHacker
 
-Libraries and other assets used
+Libraries and other assets officially used
 ===========================================================================
 
 * [bzip2](http://www.bzip.org/)
@@ -51,7 +51,7 @@ Libraries and other assets used
 * [mbedtls](https://www.trustedfirmware.org/projects/mbed-tls/)
 * [SDL](https://libsdl.org/)
 
-Instructions
+Instructions (official GUI)
 ===========================================================================
 
 Click on the elements with the mouse and draw in the field, like in MS Paint. The rest of the game is learning what happens next.
@@ -108,7 +108,7 @@ Controls
 | R                       | Rotate selected area counterclockwise when pasting stamps       |
 | F11                     | Toggle fullscreen                                               |
 
-Command Line
+Command Line (official GUI)
 ---------------------------------------------------------------------------
 
 | Command               | Description                                      | Example                                     |
