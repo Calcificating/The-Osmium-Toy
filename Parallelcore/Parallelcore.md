@@ -257,11 +257,11 @@ both should be fixed, both have permanent regression tests
 | SAND, WATR, STEAM, FIRE | can the architecture express ordinary local cellular-automaton behavior at all | yes, this is what the whole thing was originally built around |
 | ACID | can a local element affect a NEIGHBORs cell, not just its own | yes, zero resolver changes needed. `DELETE` was never actually "delete yourself", just "clear this cell", so this worked immediately |
 | PLSM | a fully random-walk mover instead of gravity or a fixed rise/fall direction | yes, but exposed the steam aging bug in the process |
-| PRTI / PRTO | the kinda hard one. arbitrary-distance action, needs global read-only state beyond neighbors | yes, with a correction along the way. first implementation (DELETE+CREATE pair) duplicated particles under contention. fixx: portal teleport is just a `MOVE` with a far-away destination instead of an adjacent one; `MOVE` was already atomic (source+destination tracked together), so this inherited that safety for nothin instead of needing a new mechanism. This also matches the exact hypothesis `far_reactions.md` made before any of this was built |
+| PRTI / PRTO | the kinda hard one. arbitrary-distance action, needs global read-only state beyond neighbors | yes, with a correction along the way. first implementation (DELETE+CREATE pair) duplicated particles under contention. fixx: portal teleport is just a `MOVE` with a far-away destination instead of an adjacent one; `MOVE` was already atomic (source+destination tracked together), so this inherited that safety for nothin instead of needing a new mechanism. This also matches the exact hypothesis `far_reaching_reacs.md` made before any of this was built |
 
 Picked ACID and PRTI/PRTO over SPRK/Pressure - SOAP-like object-graph elements, 
 and SPRK/Pressures whole-network or whole-grid dependencies, are  
-a different category (see `far_reactions.md`). Testing "does a local element bend naturally" 
+a different category (see `far_reaching_reacs.md`). Testing "does a local element bend naturally" 
 needed a local element; testing "does a far-reaching one bend or fight"
 needed something whose difficulty was really about action-at-a-distance,
 not about needing an entirely separate simulation subsystem. pressure and
