@@ -17,7 +17,7 @@ The Powder Toy is a free physics sandbox game, which simulates air pressure and 
 
 There is a Lua API – you can automate your work or even make plugins for the game. The Powder Toy is free and the source code is distributed under the GNU General Public License, so you can modify the game yourself or help with development.
 
-Libraries and other assets officially used
+## Libraries and other assets officially used
 ===========================================================================
 
 * [bzip2](http://www.bzip.org/)
@@ -31,12 +31,12 @@ Libraries and other assets officially used
 * [mbedtls](https://www.trustedfirmware.org/projects/mbed-tls/)
 * [SDL](https://libsdl.org/)
 
-**Collaborators to ParallelCore**:
+## **Collaborators to ParallelCore**:
 * _Calc_ (Calcificating)
 
 
 
-Instructions (official GUI)
+### Instructions (official GUI)
 ===========================================================================
 
 Click on the elements with the mouse and draw in the field, like in MS Paint. The rest of the game is learning what happens next.
