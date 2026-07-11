@@ -34,9 +34,9 @@ Libraries and other assets officially used
 **Collaborators to ParallelCore**:
 ===========================================================================
 * **_Calc_** (Calcificating)
-.
-.
-.
+* .
+* .
+* .
 
 
 Instructions (official GUI)
