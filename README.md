@@ -5,11 +5,11 @@ _**The Osmium Toy's**_ [research branch](https://github.com/Calcificating/The-Os
 Check the [master](https://github.com/Calcificating/The-Osmium-Toy/tree/master) for successfully implemented ideas.
 
 
-[Download The Powder Toy](https://powdertoy.co.uk/Download.html)
-[TPT on Steam](https://store.steampowered.com/app/1148350/The_Powder_Toy/).
-[Register an Account on the Official website](https://powdertoy.co.uk/Register.html).
-[The Official TPT forum](https://powdertoy.co.uk/Discussions/Categories/Index.html).
-[The Official TPT Wiki](https://powdertoy.co.uk/Wiki/W/Main_Page.html).
+[Download The Powder Toy](https://powdertoy.co.uk/Download.html) ---
+[TPT on Steam](https://store.steampowered.com/app/1148350/The_Powder_Toy/) ---
+[Register an Account on the Official website](https://powdertoy.co.uk/Register.html) ---
+[The Official TPT forum](https://powdertoy.co.uk/Discussions/Categories/Index.html) ---
+[The Official TPT Wiki](https://powdertoy.co.uk/Wiki/W/Main_Page.html)
 
 Have you ever wanted to blow something up? Or maybe you always dreamt of operating an atomic power plant? Do you have a will to develop your own CPU? The Powder Toy lets you to do all of these, and even more!
 
