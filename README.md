@@ -2,7 +2,7 @@ The Osmium Toy - July 2026
 ==========================
 
 _**The Osmium Toy's**_ [research branch](https://github.com/Calcificating/The-Osmium-Toy/tree/research) purpose is for *testing and prototyping*, *answering questions and considerations* and applying it to the Official TPT Codebase.
-Check the [master](https://github.com/Calcificating/The-Osmium-Toy/tree/master) for successfully implemented ideas.
+Check the [master branch](https://github.com/Calcificating/The-Osmium-Toy/tree/master) for successfully implemented ideas.
 
 
 [Download The Powder Toy](https://powdertoy.co.uk/Download.html) ---
