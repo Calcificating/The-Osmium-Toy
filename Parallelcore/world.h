@@ -3,6 +3,11 @@
 #include <vector>
 #include <cstdint>
 
+// call this before constructing any World if you want something other
+// than the 120x90 default. doesnt touch an already-constructed World,
+// this only sets what NEW World objects will size themselves to
+void setWorldSize(int w, int h);
+
 class World {
 public:
     World();

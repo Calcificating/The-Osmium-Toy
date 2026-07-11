@@ -1,5 +1,15 @@
 #include "world.h"
 
+// actual storage for these lives here now instead of being a const in
+// types.h. defaults match what it always used to be
+int WIDTH = 120;
+int HEIGHT = 90;
+
+void setWorldSize(int w, int h) {
+    WIDTH = w;
+    HEIGHT = h;
+}
+
 World::World() {
     cur.resize(WIDTH * HEIGHT);
     nxt.resize(WIDTH * HEIGHT);

@@ -12,6 +12,8 @@ void printWorld(World& w) {
                 case TYPE_WATER: c = '~'; break;
                 case TYPE_STEAM: c = '*'; break;
                 case TYPE_FIRE:  c = '^'; break;
+                case TYPE_ACID:  c = '@'; break;
+                case TYPE_WALL:  c = '='; break;
                 default: break;
             }
             std::cout << c;
